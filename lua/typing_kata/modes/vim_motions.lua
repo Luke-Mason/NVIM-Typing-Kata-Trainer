@@ -3,92 +3,10 @@ local BaseMode = require('typing_kata.modes.base_mode')
 local buffer_utils = require('typing_kata.ui.buffer')
 local session = require('typing_kata.core.session')
 local xp_module = require('typing_kata.core.xp')
+local motions_data = require('typing_kata.core.data.vim_motions')
+local typing_display = require('typing_kata.ui.typing_display')
 
 local VimMotions = setmetatable({}, { __index = BaseMode })
-
--- Vim motion sequences with descriptions
-VimMotions.MOTIONS = {
-  -- Basic motions
-  {keys = "h", desc = "Move left"},
-  {keys = "j", desc = "Move down"},
-  {keys = "k", desc = "Move up"},
-  {keys = "l", desc = "Move right"},
-  {keys = "w", desc = "Move to start of next word"},
-  {keys = "b", desc = "Move to start of previous word"},
-  {keys = "e", desc = "Move to end of word"},
-  {keys = "0", desc = "Move to start of line"},
-  {keys = "$", desc = "Move to end of line"},
-
-  -- Word motions with counts
-  {keys = "5w", desc = "Move 5 words forward"},
-  {keys = "3b", desc = "Move 3 words back"},
-  {keys = "10j", desc = "Move 10 lines down"},
-  {keys = "7k", desc = "Move 7 lines up"},
-
-  -- Search motions
-  {keys = "f", desc = "Find character forward in line (followed by char)"},
-  {keys = "t", desc = "Till character forward (before char)"},
-  {keys = "F", desc = "Find character backward in line"},
-  {keys = "T", desc = "Till character backward"},
-
-  -- Text objects and operators
-  {keys = "d", desc = "Delete operator"},
-  {keys = "c", desc = "Change operator"},
-  {keys = "y", desc = "Yank (copy) operator"},
-  {keys = "v", desc = "Visual mode"},
-  {keys = "V", desc = "Visual line mode"},
-
-  -- Combined operations
-  {keys = "dw", desc = "Delete word"},
-  {keys = "d3w", desc = "Delete 3 words"},
-  {keys = "ciw", desc = "Change inner word"},
-  {keys = "di(", desc = "Delete inside parentheses"},
-  {keys = "yi\"", desc = "Yank inside double quotes"},
-  {keys = "va{", desc = "Visual select around braces"},
-  {keys = "dt;", desc = "Delete till semicolon"},
-
-  -- Control combinations
-  {keys = "<C-d>", desc = "Scroll down half page"},
-  {keys = "<C-u>", desc = "Scroll up half page"},
-  {keys = "<C-f>", desc = "Scroll down full page"},
-  {keys = "<C-b>", desc = "Scroll up full page"},
-  {keys = "<C-o>", desc = "Jump to previous location"},
-  {keys = "<C-i>", desc = "Jump to next location"},
-  {keys = "<C-r>", desc = "Redo"},
-  {keys = "<C-w>v", desc = "Split window vertically"},
-  {keys = "<C-w>s", desc = "Split window horizontally"},
-  {keys = "<C-w>h", desc = "Move to left window"},
-  {keys = "<C-w>j", desc = "Move to bottom window"},
-  {keys = "<C-w>k", desc = "Move to top window"},
-  {keys = "<C-w>l", desc = "Move to right window"},
-
-  -- Insert mode combinations
-  {keys = "<C-n>", desc = "Autocomplete next"},
-  {keys = "<C-p>", desc = "Autocomplete previous"},
-  {keys = "<C-x><C-o>", desc = "Omni completion"},
-  {keys = "<C-x><C-f>", desc = "File path completion"},
-
-  -- Command combinations
-  {keys = "gg", desc = "Go to first line"},
-  {keys = "G", desc = "Go to last line"},
-  {keys = "50G", desc = "Go to line 50"},
-  {keys = "u", desc = "Undo"},
-  {keys = ".", desc = "Repeat last change"},
-  {keys = ">>", desc = "Indent line"},
-  {keys = "<<", desc = "Unindent line"},
-  {keys = "==", desc = "Auto-indent line"},
-
-  -- Marks and jumps
-  {keys = "ma", desc = "Set mark 'a'"},
-  {keys = "'a", desc = "Jump to mark 'a'"},
-  {keys = "``", desc = "Jump to last position"},
-
-  -- Macros
-  {keys = "qa", desc = "Record macro to register 'a'"},
-  {keys = "q", desc = "Stop recording macro"},
-  {keys = "@a", desc = "Play macro from register 'a'"},
-  {keys = "@@", desc = "Repeat last macro"},
-}
 
 function VimMotions:new(player)
   local obj = BaseMode:new(player, 'vim_motions')
@@ -105,8 +23,10 @@ end
 
 function VimMotions:setup()
   -- Generate random motion list
+  local all_motions = motions_data.motions
+  
   for i = 1, self.motions_per_session do
-    local motion = self.MOTIONS[math.random(#self.MOTIONS)]
+    local motion = all_motions[math.random(#all_motions)]
     table.insert(self.motion_list, motion)
   end
 end
@@ -259,11 +179,34 @@ function VimMotions:render()
     table.insert(lines, '     Description:')
     table.insert(lines, '     ' .. self.current_motion.desc)
     table.insert(lines, '')
-    table.insert(lines, '     Type the vim motion keys:')
-    table.insert(lines, '')
-    table.insert(lines, '          Target: ' .. self.current_motion.keys)
-    table.insert(lines, '          You typed: ' .. self.typed_sequence)
-    table.insert(lines, '')
+    
+    -- Use Carousel Display
+    -- "target_text" is the key sequence (self.current_motion.keys)
+    -- "current_idx" is the length of "typed_sequence"? 
+    -- Logic check: typed_sequence builds up.
+    -- errors? We reset on error, so errors table is effectively empty/unused for visual red?
+    -- Actually, if we reset immediately, we never show red.
+    -- User wants muscle memory.
+    -- Maybe we should SHOW the error briefly? 
+    -- Current logic: resets immediately.
+    -- Let's stick to current logic for now: visual typing of the target.
+    
+    local errors = {} -- No persistent errors in this mode yet
+    local display_section = typing_display.render_section(
+      self.current_motion.keys,
+      #self.typed_sequence,
+      errors,
+      "Type the keys:"
+    )
+    
+    local current_line_count = #lines
+    for _, line in ipairs(display_section.lines) do
+      table.insert(lines, line)
+    end
+    
+    -- We need to apply highlights later
+    self.pending_highlights = display_section.highlights
+    self.pending_highlight_offset = current_line_count + display_section.highlight_line_offset
   end
 
   table.insert(lines, '')
@@ -278,7 +221,6 @@ function VimMotions:render()
   -- Add consistent controls legend
   local controls = self:render_controls_legend({
     {key = 'Type', desc = 'Enter the key sequence (press actual keys: Ctrl+u = <C-u>)'},
-    {key = 'ENTER', desc = 'Submit sequence'},
     {key = 'BACKSPACE', desc = 'Delete last character'},
     {key = 'ESC', desc = 'Exit to menu'},
   })
@@ -287,6 +229,11 @@ function VimMotions:render()
   end
 
   buffer_utils.set_content(self.buffer, lines)
+  
+  if self.pending_highlights then
+    typing_display.apply_highlights(self.buffer, self.pending_highlights, self.pending_highlight_offset)
+    self.pending_highlights = nil
+  end
 end
 
 function VimMotions:calculate_xp()

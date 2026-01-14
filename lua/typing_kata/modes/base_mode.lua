@@ -14,6 +14,7 @@ function BaseMode:new(player, mode_name)
     is_running = false,
     buffer = nil,
     window = nil,
+    autocmds = {},
   }
   setmetatable(obj, self)
   return obj
@@ -38,6 +39,12 @@ end
 
 function BaseMode:calculate_xp()
   error(self.mode_name .. ': calculate_xp() must be implemented by subclass')
+end
+
+function BaseMode:add_autocmd(event, opts)
+  local id = vim.api.nvim_create_autocmd(event, opts)
+  table.insert(self.autocmds, id)
+  return id
 end
 
 -- Concrete methods (provided by base class)
@@ -86,6 +93,12 @@ end
 function BaseMode:exit()
   self.is_running = false
   session_module.end_session(self.session)
+
+  -- Cleanup autocmds
+  for _, id in ipairs(self.autocmds) do
+    pcall(vim.api.nvim_del_autocmd, id)
+  end
+  self.autocmds = {}
 
   -- Update player stats
   player_module.update_from_session(self.player, self.session)

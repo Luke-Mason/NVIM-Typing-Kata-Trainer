@@ -3,6 +3,7 @@ local BaseMode = require('typing_kata.modes.base_mode')
 local buffer_utils = require('typing_kata.ui.buffer')
 local session = require('typing_kata.core.session')
 local xp_module = require('typing_kata.core.xp')
+local typing_display = require('typing_kata.ui.typing_display')
 
 local WordTyping = setmetatable({}, { __index = BaseMode })
 
@@ -153,47 +154,22 @@ function WordTyping:render()
   table.insert(lines, string.format('     Progress: %d%% (%d/%d chars)',
     progress, self.current_char_idx, #self.target_text))
   table.insert(lines, '')
-
-  -- Display text with color coding
-  -- Split into what's typed and what's remaining
-  local typed_display = ""
-  local remaining_display = ""
-
-  for i = 1, #self.target_text do
-    if i <= self.current_char_idx then
-      -- Already typed
-      if self.errors[i] then
-        typed_display = typed_display .. self.target_text:sub(i, i)  -- Will be red
-      else
-        typed_display = typed_display .. self.target_text:sub(i, i)  -- Will be green
-      end
-    else
-      remaining_display = remaining_display .. self.target_text:sub(i, i)
-    end
-  end
-
-  -- Wrap text for display
-  table.insert(lines, '     Target Text:')
   table.insert(lines, '')
 
-  -- Simple word wrapping at ~70 chars
-  local display_text = typed_display .. remaining_display
-  local line_width = 70
-  local current_line = "     "
+  -- Typing display using monkeytype-style component
+  local display_section = typing_display.render_section(
+    self.target_text,
+    self.current_char_idx,
+    self.errors,
+    nil  -- No additional title
+  )
 
-  for word in display_text:gmatch("%S+") do
-    if #current_line + #word + 1 > line_width then
-      table.insert(lines, current_line)
-      current_line = "     " .. word .. " "
-    else
-      current_line = current_line .. word .. " "
-    end
-  end
-  if #current_line > 5 then
-    table.insert(lines, current_line)
+  -- Add typing display lines
+  local current_line_count = #lines
+  for _, line in ipairs(display_section.lines) do
+    table.insert(lines, line)
   end
 
-  table.insert(lines, '')
   table.insert(lines, '')
 
   -- Stats
@@ -201,12 +177,12 @@ function WordTyping:render()
   local accuracy = session.calculate_accuracy(self.session)
   table.insert(lines, string.format('     Current WPM: %.1f', wpm))
   table.insert(lines, string.format('     Accuracy: %.1f%%', accuracy))
-  table.insert(lines, string.format('     Errors: %d', session.current_streak, self.session.error_count))
+  table.insert(lines, string.format('     Errors: %d', self.session.error_count))
   table.insert(lines, '')
 
   -- Add consistent controls legend
   local controls = self:render_controls_legend({
-    {key = 'Type', desc = 'Type the text above as fast and accurately as you can'},
+    {key = 'Type', desc = 'Type the text as it appears (cursor stays in middle)'},
     {key = 'BACKSPACE', desc = 'Delete last character'},
     {key = 'ESC', desc = 'Exit to menu'},
   })
@@ -215,6 +191,10 @@ function WordTyping:render()
   end
 
   buffer_utils.set_content(self.buffer, lines)
+
+  -- Apply highlights
+  local total_offset = current_line_count + display_section.highlight_line_offset
+  typing_display.apply_highlights(self.buffer, display_section.highlights, total_offset)
 end
 
 function WordTyping:calculate_xp()

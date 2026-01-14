@@ -10,13 +10,17 @@ function M.create_scratch_buffer(name)
   vim.api.nvim_buf_set_option(buf, 'bufhidden', 'wipe')
   vim.api.nvim_buf_set_option(buf, 'swapfile', false)
   vim.api.nvim_buf_set_option(buf, 'modifiable', false)
-  vim.api.nvim_buf_set_option(buf, 'wrap', false)  -- Disable line wrapping
+  vim.api.nvim_buf_set_option(buf, 'wrap', false)
   vim.api.nvim_buf_set_option(buf, 'cursorline', false)
   vim.api.nvim_buf_set_option(buf, 'number', false)
   vim.api.nvim_buf_set_option(buf, 'relativenumber', false)
 
   if name then
-    vim.api.nvim_buf_set_name(buf, name)
+    local existing = vim.fn.bufnr('^' .. name .. '$')
+    if existing ~= -1 then
+      vim.api.nvim_buf_delete(existing, { force = true })
+    end
+    pcall(vim.api.nvim_buf_set_name, buf, name)
   end
 
   return buf
@@ -24,11 +28,18 @@ end
 
 -- Set buffer content with automatic highlighting
 function M.set_content(buf, lines)
-  vim.api.nvim_buf_set_option(buf, 'modifiable', true)
+  local was_modifiable = vim.api.nvim_buf_get_option(buf, 'modifiable')
+  
+  if not was_modifiable then
+    vim.api.nvim_buf_set_option(buf, 'modifiable', true)
+  end
+  
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-  vim.api.nvim_buf_set_option(buf, 'modifiable', false)
+  
+  if not was_modifiable then
+    vim.api.nvim_buf_set_option(buf, 'modifiable', false)
+  end
 
-  -- Apply automatic highlighting
   highlights.apply_highlights(buf, lines)
 end
 
@@ -39,25 +50,14 @@ function M.create_floating_window(buf, opts)
   local width = opts.width or 70
   local height = opts.height or 25
 
-  -- Get editor dimensions
   local ui = vim.api.nvim_list_uis()[1]
-  if not ui then
-    return nil
-  end
+  if not ui then return nil end
 
   local win_width = ui.width
   local win_height = ui.height
 
-  -- Center the window
   local row = math.floor((win_height - height) / 2)
   local col = math.floor((win_width - width) / 2)
-
-  -- Override if position specified
-  if opts.position == 'top' then
-    row = 2
-  elseif opts.position == 'bottom' then
-    row = win_height - height - 2
-  end
 
   local win_opts = {
     relative = 'editor',
@@ -75,25 +75,15 @@ function M.create_floating_window(buf, opts)
   end
 
   local win = vim.api.nvim_open_win(buf, true, win_opts)
-
+  
+  -- Aesthetic window options
+  vim.api.nvim_win_set_option(win, 'winhl', 'Normal:NormalFloat,FloatBorder:TypingKataBorder')
+  
   return win
 end
 
--- Open buffer in current window (full screen)
 function M.open_in_current_window(buf)
   vim.api.nvim_set_current_buf(buf)
-end
-
--- Add highlighting to specific lines
-function M.add_highlight(buf, hl_group, line, col_start, col_end)
-  local ns_id = vim.api.nvim_create_namespace('typing_kata')
-  vim.api.nvim_buf_add_highlight(buf, ns_id, hl_group, line, col_start, col_end)
-end
-
--- Clear all highlights in buffer
-function M.clear_highlights(buf)
-  local ns_id = vim.api.nvim_create_namespace('typing_kata')
-  vim.api.nvim_buf_clear_namespace(buf, ns_id, 0, -1)
 end
 
 return M

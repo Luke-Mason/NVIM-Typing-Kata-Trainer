@@ -5,22 +5,34 @@ local buffer_utils = require('typing_kata.ui.buffer')
 local ranks = require('typing_kata.core.ranks')
 local config = require('typing_kata.config')
 
+-- Constants for layout
+local WIDTH = 60
+
+-- Helper to center text in a width
+local function center(text, width)
+  local padding = math.max(0, math.floor((width - vim.fn.strdisplaywidth(text)) / 2))
+  return string.rep(' ', padding) .. text
+end
+
+-- Helper to draw a progress bar
+local function draw_progress_bar(percent, width)
+  local filled_len = math.floor((percent / 100) * width)
+  local empty_len = width - filled_len
+  return '[' .. string.rep('=', filled_len) .. string.rep('-', empty_len) .. ']'
+end
+
 -- Show main menu
 function M.show(player)
-  -- Create buffer
   local buf = buffer_utils.create_scratch_buffer('Typing Kata Menu')
-
-  -- Render menu content
   M.render_menu(buf, player)
 
-  -- Create floating window
   local ui_config = config.current.ui
   local win = buffer_utils.create_floating_window(buf, {
-    width = ui_config.menu_size.width,
-    height = ui_config.menu_size.height,
+    width = WIDTH + 4, -- Add padding for borders
+    height = 25, -- Fixed height for consistency
     position = ui_config.menu_position,
-    border = ui_config.border,
-    title = ' NVIM TYPING KATA TRAINER ',
+    border = 'rounded', -- Use Nvim's native rounded border if available
+    title = ' NVIM TYPING KATA ',
   })
 
   if not win then
@@ -28,7 +40,6 @@ function M.show(player)
     return
   end
 
-  -- Setup keymaps
   M.setup_keymaps(buf, win, player)
 end
 
@@ -36,33 +47,54 @@ end
 function M.render_menu(buf, player)
   local rank = ranks.get_rank_by_xp(player.current_xp)
   local progress = ranks.progress_to_next_rank(player.current_xp)
+  
+  local lines = {}
+  local sep_line = '─'
+  
+  -- 1. Header & Player Stats
+  table.insert(lines, '')
+  table.insert(lines, center(string.format('%s %s', rank.symbol, rank.name), WIDTH))
+  table.insert(lines, center(string.format('XP: %d', player.current_xp), WIDTH))
+  
+  -- Progress Bar
+  local bar_str = draw_progress_bar(progress, 30)
+  table.insert(lines, center(string.format('%s %d%%', bar_str, progress), WIDTH))
+  table.insert(lines, '')
 
-  local lines = {
-    '',
-    '          NVIM TYPING KATA TRAINER',
-    '          ========================',
-    '',
-    string.format('     %s %s | XP: %d', rank.symbol, rank.name, player.current_xp),
-    string.format('     Progress to Next Rank: %.1f%%', progress),
-    '',
-    '     TRAINING MODES',
-    '     ──────────────',
-    '       1  ⌨️   Neovim Commands (Key Sequences)',
-    '       2  🐍  Snake Apple (Find 🍎 in code!)',
-    '       3  🔣  Symbol Training',
-    '       4  💻  Coding Lessons',
-    '       5  📝  Word Typing (Paragraph)',
-    '       6  ⚡  Vim Motions (Key Sequences)',
-    '       7  🔤  Comprehensive Keys',
-    '       8  🎓  Vim Motions Quiz',
-    '       9  🔧  Neovim Command Quiz',
-    '',
-    '       s  📊  Stats',
-    '       q  Exit',
-    '',
-    '     Press number to select mode',
-    '',
-  }
+  -- 2. Menu Sections
+  local function add_section(title, items)
+    local header = '╭─ ' .. title .. ' ' .. string.rep('─', WIDTH - #title - 5) .. '╮'
+    table.insert(lines, header)
+    for _, item in ipairs(items) do
+      -- Format: "  [key] Name"
+      local entry = string.format('│  [%s] %-48s │', item.key, item.name)
+      table.insert(lines, entry)
+    end
+    table.insert(lines, '╰' .. string.rep('─', WIDTH - 2) .. '╯')
+  end
+
+  add_section('FUNDAMENTALS', {
+    { key = '3', name = 'Symbol Training' },
+    { key = '7', name = 'Comprehensive Keys' },
+    { key = '1', name = 'Neovim Commands (Key Sequences)' },
+  })
+  
+  add_section('PRACTICE MODES', {
+    { key = '5', name = 'Word Typing (WPM)' },
+    { key = '2', name = 'Snake Apple (Navigation)' },
+    { key = '6', name = 'Vim Motions' },
+    { key = '4', name = 'Coding Lessons' },
+  })
+  
+  add_section('QUIZZES', {
+    { key = '8', name = 'Vim Motions Quiz' },
+    { key = '9', name = 'Neovim Command Quiz' },
+  })
+
+  -- Footer
+  table.insert(lines, '')
+  table.insert(lines, center('[s] Stats    [q] Quit', WIDTH))
+  table.insert(lines, '')
 
   buffer_utils.set_content(buf, lines)
 end
@@ -86,18 +118,16 @@ function M.setup_keymaps(buf, win, player)
 
   for i = 1, 9 do
     vim.keymap.set('n', tostring(i), function()
-      -- Close menu
       if vim.api.nvim_win_is_valid(win) then
         vim.api.nvim_win_close(win, true)
       end
 
-      -- Launch mode
       local mode_name = mode_mapping[i]
       local ok, mode_module = pcall(require, 'typing_kata.modes.' .. mode_name)
 
       if not ok then
-        vim.notify('Mode not yet implemented: ' .. mode_name, vim.log.levels.WARN)
-        M.show(player)  -- Return to menu
+        vim.notify('Mode error: ' .. mode_name, vim.log.levels.WARN)
+        M.show(player)
         return
       end
 
@@ -106,7 +136,7 @@ function M.setup_keymaps(buf, win, player)
     end, opts)
   end
 
-  -- Stats screen
+  -- Stats
   vim.keymap.set('n', 's', function()
     if vim.api.nvim_win_is_valid(win) then
       vim.api.nvim_win_close(win, true)
