@@ -12,9 +12,7 @@ function VimMotions:new(player)
   local obj = BaseMode:new(player, 'vim_motions')
   setmetatable(obj, { __index = self })
 
-  obj.motions_per_session = 20
-  obj.current_motion_idx = 1
-  obj.motion_list = {}
+  obj.motions_completed = 0
   obj.current_motion = nil
   obj.typed_sequence = ""
 
@@ -22,22 +20,13 @@ function VimMotions:new(player)
 end
 
 function VimMotions:setup()
-  -- Generate random motion list
-  local all_motions = motions_data.motions
-  
-  for i = 1, self.motions_per_session do
-    local motion = all_motions[math.random(#all_motions)]
-    table.insert(self.motion_list, motion)
-  end
+  -- No pre-generation needed, will generate on-demand
 end
 
 function VimMotions:generate_task()
-  if self.current_motion_idx > #self.motion_list then
-    self:exit()
-    return
-  end
-
-  self.current_motion = self.motion_list[self.current_motion_idx]
+  -- Pick a random motion each time
+  local all_motions = motions_data.motions
+  self.current_motion = all_motions[math.random(#all_motions)]
   self.typed_sequence = ""
 end
 
@@ -151,7 +140,7 @@ function VimMotions:complete_motion()
   session.add_task_completion(self.session, xp)
   session.increment_streak(self.session)
 
-  self.current_motion_idx = self.current_motion_idx + 1
+  self.motions_completed = self.motions_completed + 1
   self:generate_task()
   self:render()
 end
@@ -170,8 +159,8 @@ function VimMotions:render()
   table.insert(lines, '')
 
   -- Progress
-  table.insert(lines, string.format('     Motion: %d/%d',
-    self.current_motion_idx, self.motions_per_session))
+  table.insert(lines, string.format('     Motions Completed: %d',
+    self.motions_completed))
   table.insert(lines, '')
 
   -- Current motion description
@@ -196,7 +185,8 @@ function VimMotions:render()
       self.current_motion.keys,
       #self.typed_sequence,
       errors,
-      "Type the keys:"
+      "Type the keys:",
+      { show_sandwich_cursor = true }
     )
     
     local current_line_count = #lines

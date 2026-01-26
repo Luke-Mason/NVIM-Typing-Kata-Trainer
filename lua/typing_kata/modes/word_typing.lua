@@ -161,7 +161,8 @@ function WordTyping:render()
     self.target_text,
     self.current_char_idx,
     self.errors,
-    nil  -- No additional title
+    nil, -- No additional title
+    { show_sandwich_cursor = true }
   )
 
   -- Add typing display lines

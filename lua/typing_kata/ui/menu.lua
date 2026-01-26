@@ -108,7 +108,7 @@ function M.setup_keymaps(buf, win, player)
     'custom_keybindings',
     'snake_apple',
     'symbol_training',
-    'coding_lessons',
+    'coding_lessons',  -- This will be special-cased to show submenu
     'word_typing',
     'vim_motions',
     'comprehensive_keys',
@@ -123,6 +123,13 @@ function M.setup_keymaps(buf, win, player)
       end
 
       local mode_name = mode_mapping[i]
+
+      -- Special case for coding_lessons - show submenu
+      if mode_name == 'coding_lessons' then
+        M.show_coding_lessons_submenu(player)
+        return
+      end
+
       local ok, mode_module = pcall(require, 'typing_kata.modes.' .. mode_name)
 
       if not ok then
@@ -153,6 +160,34 @@ function M.setup_keymaps(buf, win, player)
 
   vim.keymap.set('n', 'q', quit, opts)
   vim.keymap.set('n', '<Esc>', quit, opts)
+end
+
+-- Show coding lessons submenu
+function M.show_coding_lessons_submenu(player)
+  local submenu = require('typing_kata.ui.submenu')
+
+  local function launch_coding_mode(language_filter)
+    local ok, mode_module = pcall(require, 'typing_kata.modes.coding_lessons')
+    if not ok then
+      vim.notify('Failed to load coding lessons mode', vim.log.levels.ERROR)
+      M.show(player)
+      return
+    end
+
+    local mode = mode_module:new(player, language_filter)
+    mode:start()
+  end
+
+  local options = {
+    { key = '1', name = 'Random (All Languages)', action = function() launch_coding_mode(nil) end },
+    { key = '2', name = 'Go', action = function() launch_coding_mode('go') end },
+    { key = '3', name = 'Python', action = function() launch_coding_mode('python') end },
+    { key = '4', name = 'JavaScript', action = function() launch_coding_mode('javascript') end },
+    { key = '5', name = 'YAML', action = function() launch_coding_mode('yaml') end },
+    { key = '6', name = 'Rust', action = function() launch_coding_mode('rust') end },
+  }
+
+  submenu.show('CODING LESSONS - SELECT LANGUAGE', options, player)
 end
 
 return M

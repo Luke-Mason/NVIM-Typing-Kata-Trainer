@@ -5,6 +5,7 @@ M.samples = {
   {
     filetype = "go",
     name = "user_service.go",
+    indent = 4,
     code = [[
 package main
 
@@ -72,6 +73,7 @@ func (s *UserService) ValidateCredentials(email, password string) bool {
   {
     filetype = "python",
     name = "data_processor.py",
+    indent = 4,
     code = [[
 import pandas as pd
 import numpy as np
@@ -132,6 +134,7 @@ def create_processor(batch_size: int = 100) -> DataProcessor:
   {
     filetype = "javascript",
     name = "api_client.js",
+    indent = 2,
     code = [[
 import axios from 'axios';
 import { logger } from './logger';
@@ -206,6 +209,7 @@ export class ApiError extends Error {
   {
     filetype = "yaml",
     name = "kubernetes.yaml",
+    indent = 2,
     code = [[
 apiVersion: v1
 kind: Service
@@ -287,6 +291,7 @@ data:
   {
     filetype = "rust",
     name = "message_queue.rs",
+    indent = 4,
     code = [[
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};

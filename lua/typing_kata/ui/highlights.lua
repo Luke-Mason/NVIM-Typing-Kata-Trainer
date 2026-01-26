@@ -53,8 +53,9 @@ function M.setup()
   -- Game / Typing
   vim.api.nvim_set_hl(0, 'TypingKataCorrect', { fg = colors.green })
   vim.api.nvim_set_hl(0, 'TypingKataIncorrect', { fg = colors.red, underline = true })
-  vim.api.nvim_set_hl(0, 'TypingKataTarget', { fg = colors.text, bg = colors.surface1 }) -- Cursor/Current char
+  vim.api.nvim_set_hl(0, 'TypingKataTarget', { fg = colors.mantle, bg = colors.blue, bold = true }) -- Focused cursor char
   vim.api.nvim_set_hl(0, 'TypingKataUntyped', { fg = colors.overlay0 })
+  vim.api.nvim_set_hl(0, 'TypingKataCursor', { fg = colors.blue, reverse = true }) -- The | cursor
   
   -- Ranks & Progression
   vim.api.nvim_set_hl(0, 'TypingKataRank', { fg = colors.mauve, bold = true })

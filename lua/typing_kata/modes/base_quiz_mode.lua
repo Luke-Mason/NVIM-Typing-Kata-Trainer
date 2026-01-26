@@ -11,9 +11,7 @@ function BaseQuizMode:new(player, mode_name)
   local obj = BaseMode:new(player, mode_name)
   setmetatable(obj, { __index = self })
 
-  obj.questions_per_session = 15
-  obj.current_question_idx = 1
-  obj.question_list = {}
+  obj.questions_completed = 0
   obj.current_question = nil
   obj.typed_answer = ""
   obj.show_answer = false
@@ -32,32 +30,13 @@ function BaseQuizMode:check_answer(typed, question)
 end
 
 function BaseQuizMode:setup()
-  local all_questions = self:get_questions()
-
-  -- Shuffle
-  local shuffled = {}
-  for i = 1, #all_questions do
-    shuffled[i] = all_questions[i]
-  end
-
-  for i = #shuffled, 2, -1 do
-    local j = math.random(i)
-    shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
-  end
-
-  -- Take N questions
-  for i = 1, math.min(self.questions_per_session, #shuffled) do
-    table.insert(self.question_list, shuffled[i])
-  end
+  -- No pre-generation needed, will generate on-demand
 end
 
 function BaseQuizMode:generate_task()
-  if self.current_question_idx > #self.question_list then
-    self:exit()
-    return
-  end
-
-  self.current_question = self.question_list[self.current_question_idx]
+  -- Pick a random question each time
+  local all_questions = self:get_questions()
+  self.current_question = all_questions[math.random(#all_questions)]
   self.typed_answer = ""
   self.show_answer = false
 end
@@ -144,7 +123,6 @@ function BaseQuizMode:skip()
     self.show_answer = true
     self:render()
   else
-    self.current_question_idx = self.current_question_idx + 1
     self:generate_task()
     self:render()
   end
@@ -161,10 +139,10 @@ function BaseQuizMode:submit()
 
     local xp = self:calculate_xp()
     session.add_task_completion(self.session, xp)
+    self.questions_completed = self.questions_completed + 1
 
     vim.defer_fn(function()
       if self.is_running then
-        self.current_question_idx = self.current_question_idx + 1
         self:generate_task()
         self:render()
       end

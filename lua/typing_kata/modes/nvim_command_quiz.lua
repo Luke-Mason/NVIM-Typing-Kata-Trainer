@@ -55,8 +55,8 @@ function NvimCommandQuiz:render()
   table.insert(lines, '                     💡 SPACE = <leader>')
   table.insert(lines, '                     (Type: <leader>ff for leader+f+f)')
   table.insert(lines, '')
-  table.insert(lines, string.format('                     Question %d of %d',
-    self.current_question_idx, self.questions_per_session))
+  table.insert(lines, string.format('                     Questions Completed: %d',
+    self.questions_completed))
   table.insert(lines, '')
   table.insert(lines, '───────────────────────────────────────────────────────────────────')
   table.insert(lines, '')

@@ -7,19 +7,38 @@ local typing_display = require('typing_kata.ui.typing_display')
 
 local CodingLessons = setmetatable({}, { __index = WordTyping })
 
-function CodingLessons:new(player)
+function CodingLessons:new(player, language_filter)
   local obj = WordTyping:new(player)
   obj.mode_name = 'coding_lessons'
+  obj.language_filter = language_filter  -- nil for random, or specific filetype like 'python', 'go', etc.
   setmetatable(obj, { __index = self })
   return obj
 end
 
 function CodingLessons:generate_task()
-  local sample = code_samples.samples[math.random(#code_samples.samples)]
+  -- Filter samples by language if specified
+  local available_samples = {}
+  if self.language_filter then
+    for _, sample in ipairs(code_samples.samples) do
+      if sample.filetype == self.language_filter then
+        table.insert(available_samples, sample)
+      end
+    end
+  else
+    available_samples = code_samples.samples
+  end
+
+  -- If no samples match filter, fall back to all samples
+  if #available_samples == 0 then
+    available_samples = code_samples.samples
+  end
+
+  local sample = available_samples[math.random(#available_samples)]
   self.target_text = sample.code:gsub("\r\n", "\n")
   self.sample_name = sample.name
   self.sample_filetype = sample.filetype
-  
+  self.indent_size = sample.indent or 4  -- Default to 4 if not specified
+
   self.typed_text = ""
   self.current_char_idx = 0
   self.errors = {}
@@ -28,24 +47,23 @@ end
 function CodingLessons:setup_buffer_keymaps()
   WordTyping.setup_buffer_keymaps(self)
   local opts = { buffer = self.buffer, noremap = true, silent = true }
-  
+
   -- Handle Enter
   vim.keymap.set('i', '<CR>', function() return self:handle_char('\n') end, opts)
-  
-  -- Handle Tab (convert to 4 spaces to match many samples, or handle literal tab)
-  -- For simplicity, let's treat tab as 4 spaces if the code has spaces, 
-  -- but our samples use spaces. Let's just map Tab to handle ' ' 4 times?
-  -- Or just map Tab to literal \t? 
-  -- Most samples look like they use spaces.
-  -- Let's stick to simple character matching. If the user presses Tab, and the code has 4 spaces, 
-  -- it should probably fail or we handle it smart. 
-  -- "The less code the better": Let's assume the user types spaces. 
-  -- But usually in vim you press Tab.
-  -- Let's map Tab to inserted 4 spaces for convenience.
-  vim.keymap.set('i', '<Tab>', function() 
+
+  -- Handle Tab - insert spaces based on sample's indent size
+  vim.keymap.set('i', '<Tab>', function()
     local s = ""
-    for _=1,4 do s = s .. self:handle_char(' ') end
+    for _=1,(self.indent_size or 4) do
+      s = s .. self:handle_char(' ')
+    end
     return s
+  end, opts)
+
+  -- Skip to next sample (Ctrl+N in normal mode)
+  vim.keymap.set('n', '<C-n>', function()
+    self:generate_task()
+    self:render()
   end, opts)
 end
 
@@ -54,7 +72,11 @@ function CodingLessons:render()
   
   -- Header
   table.insert(lines, '')
-  table.insert(lines, '     💻 CODING LESSONS: ' .. (self.sample_name or 'Unknown'))
+  local mode_title = '💻 CODING LESSONS'
+  if self.language_filter then
+    mode_title = mode_title .. ' [' .. self.language_filter:upper() .. ']'
+  end
+  table.insert(lines, '     ' .. mode_title .. ': ' .. (self.sample_name or 'Unknown'))
   table.insert(lines, '     =================================')
   table.insert(lines, '')
   
@@ -71,12 +93,13 @@ function CodingLessons:render()
     self.target_text,
     self.current_char_idx,
     self.errors,
-    9 -- Viewport height (odd number for centering)
+    11 -- Viewport height
   )
   
-  -- Add typing display lines
+  -- Add typing display lines with 5 spaces margin
+  local margin = '     '
   for _, line in ipairs(display_lines) do
-    table.insert(lines, '     ' .. line)
+    table.insert(lines, margin .. line)
   end
   
   -- Footer / Controls
@@ -84,7 +107,8 @@ function CodingLessons:render()
   local controls = self:render_controls_legend({
     {key = 'Type', desc = 'Type the code exactly'},
     {key = 'ENTER', desc = 'New line'},
-    {key = 'TAB', desc = '4 spaces'},
+    {key = 'TAB', desc = (self.indent_size or 4) .. ' spaces'},
+    {key = 'Ctrl+N', desc = 'Skip to next'},
     {key = 'ESC', desc = 'Exit'},
   })
   for _, line in ipairs(controls) do

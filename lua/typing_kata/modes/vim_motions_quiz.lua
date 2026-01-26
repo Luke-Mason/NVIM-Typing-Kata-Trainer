@@ -43,8 +43,8 @@ function VimMotionsQuiz:render()
   table.insert(lines, '                     💡 SPACE = <leader>')
   table.insert(lines, '                     (Type: <leader>rn for leader+r+n)')
   table.insert(lines, '')
-  table.insert(lines, string.format('                     Question %d of %d',
-    self.current_question_idx, self.questions_per_session))
+  table.insert(lines, string.format('                     Questions Completed: %d',
+    self.questions_completed))
   table.insert(lines, '')
   table.insert(lines, '───────────────────────────────────────────────────────────────────')
   table.insert(lines, '')
